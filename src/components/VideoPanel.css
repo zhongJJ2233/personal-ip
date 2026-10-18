@@ -685,8 +685,8 @@
 
 @media (max-width: 980px) {
   .video-modal { overflow-y: auto; }
-  .video-modal-grid { display: flex; flex-direction: column; min-height: auto; }
-  .video-modal-stage { border-right: 0; border-bottom: 1px solid var(--line); }
+  .video-modal-grid { display: flex; flex-direction: column; align-items: stretch; min-height: auto; }
+  .video-modal-stage { width: 100%; border-right: 0; border-bottom: 1px solid var(--line); }
   .video-modal-side { max-height: none; padding: 18px 16px 30px; }
   .video-comments { overflow: visible; flex: none; }
 }
