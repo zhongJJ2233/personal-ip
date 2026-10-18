@@ -6,6 +6,7 @@ import DotField from './components/DotField';
 import StrokeText from './components/StrokeText';
 import VideoPanel from './components/VideoPanel';
 import BlogPanel from './components/BlogPanel';
+import BeijingClock from './components/BeijingClock';
 import './styles.css';
 
 function TitleLine({ text, color = '#0e2a33', trigger = 'scroll', highlights = [] }) {
@@ -51,6 +52,7 @@ function App() {
           <p className="hero-subtitle reveal-item delay-2">这是来自我的个人IP。<br />我把观察变成内容，把灵感变成可以参与的体验。</p>
           <a className="text-link reveal-item delay-3" href="#about">认识我 <span aria-hidden="true">↓</span></a>
         </div>
+        <BeijingClock />
         <div className="hero-visual reveal-item delay-2">
           <div className="visual-note">点击图像<br />切换视角</div>
           <PixelSwap

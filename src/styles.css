@@ -71,6 +71,67 @@ button { color: inherit; font: inherit; }
 .visual-index { position: absolute; right: -3px; bottom: -26px; color: var(--paper-dim); }
 .visual-index span { margin: 0 8px; color: var(--mint-deep); }
 
+/* ---- 北京标准时间（Hero 右侧空档） ---- */
+.hero-clock {
+  position: absolute;
+  top: 17%;
+  left: 46%;
+  width: calc(54% - 8.5vw - 430px - 3vw);
+  min-width: 150px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  text-align: left;
+}
+.clock-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  color: var(--mint-deep);
+  font: 11px/1.45 Arial, sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.clock-live {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mint);
+  animation: clock-pulse 2.6s ease-out infinite;
+}
+@keyframes clock-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(63, 191, 154, 0.55); }
+  70% { box-shadow: 0 0 0 9px rgba(63, 191, 154, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(63, 191, 154, 0); }
+}
+.clock-time {
+  margin: 0;
+  color: var(--ink);
+  font: 400 clamp(28px, 2.6vw, 46px)/1 Arial, sans-serif;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.clock-seconds { color: var(--sky-deep); }
+.clock-date {
+  margin: 2px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.clock-zone {
+  margin: 0;
+  color: var(--paper-dim);
+  font: 10px/1.5 Arial, sans-serif;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+
 .pixel-swap { width: 100%; overflow: hidden; isolation: isolate; outline: none; background: var(--panel); cursor: pointer; }
 .pixel-swap:focus-visible { outline: 2px solid var(--sky-deep); outline-offset: 5px; }
 .pixel-swap__layer { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -155,6 +216,32 @@ button { color: inherit; font: inherit; }
 @keyframes enter { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes ticker { to { transform: translateX(-35%) rotate(-6deg); } }
 
+@media (max-width: 1320px) and (min-width: 821px) {
+  /* 中等宽度：留给时间块的横向空档不够了，改成「左下角时间 + 右侧人像」两行排布 */
+  .hero-section {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 0.9fr);
+    align-items: start;
+    gap: 34px 7vw;
+    padding: 64px 7vw 84px;
+  }
+  .hero-copy { grid-column: 1; grid-row: 1; }
+  .hero-clock {
+    position: static;
+    grid-column: 1;
+    grid-row: 2;
+    width: auto;
+    max-width: 340px;
+    margin-top: 2px;
+  }
+  .hero-visual {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    justify-self: end;
+    width: min(100%, 430px);
+  }
+}
+
 @media (max-width: 820px) {
   .topbar { height: 66px; padding: 0 5vw; }
   .nav-links { display: none; }
@@ -162,6 +249,7 @@ button { color: inherit; font: inherit; }
   .hero-section::before { display: none; }
   .hero-title { font-size: clamp(68px, 18vw, 118px); }
   .hero-visual { justify-self: start; width: min(100%, 450px); margin-left: 8vw; }
+  .hero-clock { position: static; width: auto; max-width: 100%; margin: 6px 0 0; }
   .signal-strip { padding: 0 7vw; overflow-x: auto; justify-content: flex-start; gap: 28px; white-space: nowrap; }
   .about-section, .works-section { padding: 105px 7vw; }
   .about-grid { grid-template-columns: 1fr; gap: 45px; }

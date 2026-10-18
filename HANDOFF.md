@@ -268,3 +268,22 @@ git add -A && git commit -m "..." && git push   # push 触发 GitHub Actions 自
 - 站主登录沿用同一套 Supabase Auth（`signIn`/`signOut`），演示模式下任意账号可进（提示文案已注明）。
 
 **验证**：`npm run build` 通过（CSS 40.5KB gzip 8.3KB，JS 327KB gzip 115KB）；CDP 实测通过：站主登录 → 发帖 → 卡片置顶 → 点赞 → 打开阅读 → emoji 插入 → 发评论 → 转发 → 深链 `#post/demo-post-1` 自动打开 → 编辑改名 → 两步删除 → 退出；1440 / 390 两档截图在 `.dsh/blog-after/`；控制台无报错；`inspect.mjs` 审计 10 FAIL / 5 WARN（与加面板前一致，均为既有的编辑风设计选择：装饰序号、hairline、渐变、小字等）。
+
+## 12. 2026-10-18 21:xx · 首屏加「北京时间」实时时钟
+
+**动机**：用户 m01835 截图（在首屏左侧标题与右侧人像之间的空档画了红框）：「在这个位置加上一个详细标准的北京时间显示」。
+
+**落点**：新增 `src/components/BeijingClock.jsx`，渲染在 `src/main.jsx` 的 `.hero-copy` 与 `.hero-visual` 之间（`<BeijingClock />`）。
+- 时区固定 `Asia/Shanghai`（`Intl.DateTimeFormat` 的 `timeZone`），**与访客本机时区无关**；`zh-CN` 出日期与星期，`en-GB` + `hour12:false` 出 `HH:MM:SS`。
+- 秒针用 `setTimeout(1000 - Date.now() % 1000)` 对齐整秒刷新，不会因为进页面的时刻偏半格。
+- 展示四行：`● 北京时间 · BEIJING TIME` / `21:30:50`（秒用 sky-deep 蓝色）/ `2026年10月18日 · 星期日` / `UTC+8 · ASIA/SHANGHAI`。
+
+**布局**（`src/styles.css`）：
+- ≥1321px：`.hero-clock` 绝对定位在空档里，`top:17%; left:46%; width:calc(54% - 8.5vw - 430px - 3vw)`——宽度由「人像左边到 46% 竖线右边」的实际空档算出来，不会压到人像；`white-space: nowrap` 防数字换行。
+- 821–1320px：横向空档不够，改为两行网格（`grid-row:1` 文案 / `grid-row:2` 时钟，人像 `grid-row:1/span 2` 居中跨行），时钟落在「认识我」下方。
+- ≤820px：单列自然排在文案与人像之间（`position: static`）。
+- 断点先定 1320 是因为 1280 宽时空档只剩约 178px，放不下完整时间块；实测 1440/1280/1024/390 四档截图均无重叠、无横向溢出。
+
+**验证**：`npm run build` 通过（CSS 41.8KB gzip 8.6KB，JS 328KB gzip 115.5KB）；CDP 截图 `artifacts/hero-clock.png`；`document.querySelector('.hero-clock')` 的 `getBoundingClientRect` 确认 `right <= .hero-visual.left`；控制台无报错（仅 Edge 自带扩展的无关 TypeError）。
+
+**状态**：已在本地提交；**是否发布等待用户确认**（推送需 GitHub 设备授权）。
