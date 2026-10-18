@@ -4,6 +4,7 @@ import PixelSwap from './components/PixelSwap';
 import AccordionGallery from './components/AccordionGallery';
 import DotField from './components/DotField';
 import StrokeText from './components/StrokeText';
+import VideoPanel from './components/VideoPanel';
 import './styles.css';
 
 function TitleLine({ text, color = '#f2f1e9', trigger = 'scroll', highlights = [] }) {
@@ -34,7 +35,7 @@ function App() {
     <DotField className="site-dot-field" dotRadius={2} dotSpacing={20} cursorRadius={280} bulgeStrength={67} glowRadius={160} gradientFrom="rgba(215, 251, 85, 0.32)" gradientTo="rgba(201, 203, 192, 0.18)" glowColor="rgba(215, 251, 85, 0.10)" />
     <header className="topbar">
       <a className="brand" href="#top" aria-label="回到首页"><span className="brand-mark">L</span><span>LI / LAB</span></a>
-      <nav className="nav-links" aria-label="主导航"><a href="#about">关于我</a><a href="#works">正在做</a><a href="#contact">联系我</a></nav>
+      <nav className="nav-links" aria-label="主导航"><a href="#about">关于我</a><a href="#works">正在做</a><a href="#video">影像</a><a href="#contact">联系我</a></nav>
       <a className="nav-cta" href="mailto:hello@lilab.studio">合作邀约 <span aria-hidden="true">↗</span></a>
     </header>
 
@@ -78,7 +79,8 @@ function App() {
           <a href="#top"><span className="panel-directory-number">01</span><span className="panel-directory-name">首页</span><span className="panel-directory-target">TOP</span><span className="panel-directory-arrow" aria-hidden="true">↘</span></a>
           <a href="#about"><span className="panel-directory-number">02</span><span className="panel-directory-name">关于我</span><span className="panel-directory-target">ABOUT</span><span className="panel-directory-arrow" aria-hidden="true">↘</span></a>
           <a href="#works"><span className="panel-directory-number">03</span><span className="panel-directory-name">正在做的事</span><span className="panel-directory-target">WORKS</span><span className="panel-directory-arrow" aria-hidden="true">↘</span></a>
-          <a href="#contact"><span className="panel-directory-number">04</span><span className="panel-directory-name">联系我</span><span className="panel-directory-target">CONTACT</span><span className="panel-directory-arrow" aria-hidden="true">↘</span></a>
+          <a href="#video"><span className="panel-directory-number">04</span><span className="panel-directory-name">影像</span><span className="panel-directory-target">VIDEO</span><span className="panel-directory-arrow" aria-hidden="true">↘</span></a>
+          <a href="#contact"><span className="panel-directory-number">05</span><span className="panel-directory-name">联系我</span><span className="panel-directory-target">CONTACT</span><span className="panel-directory-arrow" aria-hidden="true">↘</span></a>
         </nav>
       </section>
 
@@ -99,7 +101,9 @@ function App() {
         <AccordionGallery items={workItems} defaultIndex={2} expandRatio={0.52} trigger="hover" height={430} gap={10} radius={0} accentColor="#d7fb55" overlayColor="#11130f" textColor="#f2f1e9" grayscale parallax={0.48} tilt={6} />
       </section>
 
-      <section className="contact-section" id="contact"><DotField dotRadius={2} dotSpacing={20} cursorRadius={280} bulgeStrength={67} glowRadius={160} gradientFrom="rgba(17, 19, 15, 0.22)" gradientTo="rgba(17, 19, 15, 0.14)" glowColor="rgba(17, 19, 15, 0.08)" /><div className="contact-orbit" aria-hidden="true"><span>LET’S MAKE SOMETHING WORTH REMEMBERING • </span><span>LET’S MAKE SOMETHING WORTH REMEMBERING • </span></div><div className="contact-content"><div className="section-kicker">SAY HELLO / 03</div><h2 aria-label="或许，我们可以进一步了解"><TitleLine text="或许" color="#11130f" /><TitleLine text="我们可以进一步了解" color="#11130f" /></h2><span className="contact-link">428982120@qq.com</span></div></section>
+      <VideoPanel />
+
+      <section className="contact-section" id="contact"><DotField dotRadius={2} dotSpacing={20} cursorRadius={280} bulgeStrength={67} glowRadius={160} gradientFrom="rgba(17, 19, 15, 0.22)" gradientTo="rgba(17, 19, 15, 0.14)" glowColor="rgba(17, 19, 15, 0.08)" /><div className="contact-orbit" aria-hidden="true"><span>LET’S MAKE SOMETHING WORTH REMEMBERING • </span><span>LET’S MAKE SOMETHING WORTH REMEMBERING • </span></div><div className="contact-content"><div className="section-kicker">SAY HELLO / 04</div><h2 aria-label="或许，我们可以进一步了解"><TitleLine text="或许" color="#11130f" /><TitleLine text="我们可以进一步了解" color="#11130f" /></h2><span className="contact-link">428982120@qq.com</span></div></section>
     </main>
 
     <footer className="footer"><span>© 2024 LI / LAB</span><span>在这里，保持好奇。</span><a href="#top">回到顶部 ↑</a></footer>

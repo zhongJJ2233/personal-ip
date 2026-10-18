@@ -25,6 +25,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_OWNER_EMAIL: ${{ vars.VITE_OWNER_EMAIL }}
+          VITE_BILIBILI_PROFILE: ${{ vars.VITE_BILIBILI_PROFILE }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
