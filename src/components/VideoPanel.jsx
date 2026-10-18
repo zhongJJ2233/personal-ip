@@ -19,6 +19,7 @@ import {
   signOut,
   toggleLike
 } from '../lib/store';
+import { fetchBiliInfo, getCachedBili } from '../lib/bili';
 import './VideoPanel.css';
 
 const BVID_PATTERN = /^BV[0-9A-Za-z]{10}$/;
@@ -73,6 +74,10 @@ export default function VideoPanel() {
   const [likes, setLikes] = useState({});
   const [likeBusy, setLikeBusy] = useState({});
 
+  const [biliCovers, setBiliCovers] = useState({});
+  const [brokenCovers, setBrokenCovers] = useState({});
+  const [autoCoverBusy, setAutoCoverBusy] = useState(false);
+
   const demo = isDemo();
   const activeVideo = useMemo(() => videos.find((v) => v.id === activeId) || null, [videos, activeId]);
 
@@ -107,6 +112,34 @@ export default function VideoPanel() {
       .catch(() => {
         /* 点赞数加载失败不阻塞页面，按钮仍可点击 */
       });
+    return () => {
+      alive = false;
+    };
+  }, [videos]);
+
+  // 没有自定义封面的影像，用 B 站公开接口自动补一张（结果缓存 7 天）
+  useEffect(() => {
+    let alive = true;
+    const need = [];
+    const cachedMap = {};
+    videos.forEach((video) => {
+      if (video.cover_url || !BVID_PATTERN.test(video.bvid)) return;
+      const cached = getCachedBili(video.bvid);
+      if (cached?.pic) cachedMap[video.bvid] = cached.pic;
+      else if (!need.includes(video.bvid)) need.push(video.bvid);
+    });
+    if (Object.keys(cachedMap).length) {
+      setBiliCovers((prev) => ({ ...prev, ...cachedMap }));
+    }
+    need.forEach((bvid) => {
+      fetchBiliInfo(bvid)
+        .then((info) => {
+          if (alive && info.pic) setBiliCovers((prev) => ({ ...prev, [bvid]: info.pic }));
+        })
+        .catch(() => {
+          /* 取不到就保持编号占位图 */
+        });
+    });
     return () => {
       alive = false;
     };
@@ -204,6 +237,27 @@ export default function VideoPanel() {
           }
         : emptyDraft()
     );
+  };
+
+  const handleAutoCover = async () => {
+    const bvid = (draft?.bvid || '').trim();
+    if (!BVID_PATTERN.test(bvid)) {
+      setDraftError('先填一个正确的 BV 号，再点自动获取');
+      return;
+    }
+    setAutoCoverBusy(true);
+    setDraftError('');
+    try {
+      const info = await fetchBiliInfo(bvid, { force: true });
+      if (!info.pic) throw new Error('这支视频没有可用的封面');
+      setDraft((d) => (d ? { ...d, cover_url: info.pic, title: d.title || info.title } : d));
+      setBiliCovers((prev) => ({ ...prev, [bvid]: info.pic }));
+      setNotice('已填入 B 站封面');
+    } catch (err) {
+      setDraftError(err.message || '封面获取失败，也可以直接粘贴图片地址');
+    } finally {
+      setAutoCoverBusy(false);
+    }
   };
 
   const handleSaveVideo = async (e) => {
@@ -383,6 +437,8 @@ export default function VideoPanel() {
         <div className="video-grid">
           {videos.map((video, index) => {
             const like = likes[video.id] || { count: 0, liked: false };
+            const coverSrc = video.cover_url || biliCovers[video.bvid] || '';
+            const coverBroken = Boolean(brokenCovers[video.bvid]);
             return (
               <article className="video-card" key={video.id}>
                 <button
@@ -391,15 +447,15 @@ export default function VideoPanel() {
                   onClick={() => setActiveId(video.id)}
                   aria-label={`打开 ${video.title}`}
                 >
-                  {video.cover_url ? (
+                  {coverSrc && !coverBroken ? (
                     <img
-                      src={video.cover_url}
+                      src={coverSrc}
                       alt=""
                       loading="lazy"
                       referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
+                      onError={() =>
+                        setBrokenCovers((prev) => ({ ...prev, [video.bvid]: true }))
+                      }
                     />
                   ) : (
                     <span className="video-card-placeholder" aria-hidden="true">
@@ -640,11 +696,21 @@ export default function VideoPanel() {
               />
             </label>
             <label>
-              <span>封面图链接</span>
+              <span className="video-field-head">
+                封面图链接
+                <button
+                  type="button"
+                  className="video-inline-link"
+                  onClick={handleAutoCover}
+                  disabled={autoCoverBusy}
+                >
+                  {autoCoverBusy ? '获取中…' : '从 B 站自动获取'}
+                </button>
+              </span>
               <input
                 value={draft.cover_url}
                 onChange={(e) => setDraft((d) => ({ ...d, cover_url: e.target.value }))}
-                placeholder="可选，粘贴图片地址"
+                placeholder="可选，留空就自动用 B 站封面"
               />
             </label>
             <label>

@@ -706,6 +706,29 @@
   text-transform: uppercase;
 }
 
+.video-sheet label > span.video-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.video-inline-link {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: none;
+  color: var(--acid);
+  font: 10px/1.2 Arial, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: none;
+  cursor: pointer;
+  transition: opacity 160ms ease;
+}
+.video-inline-link:hover { opacity: 0.7; }
+.video-inline-link:disabled { opacity: 0.5; cursor: default; }
+
+
 .video-sheet-note {
   margin: 0 0 18px;
   color: var(--paper-dim);
