@@ -10,12 +10,14 @@ import {
   isDemo,
   isOwner,
   listComments,
+  listLikes,
   listVideos,
   ownerEmail,
   saveNickname,
   saveVideo,
   signIn,
-  signOut
+  signOut,
+  toggleLike
 } from '../lib/store';
 import './VideoPanel.css';
 
@@ -68,6 +70,9 @@ export default function VideoPanel() {
   const [danmakuOn, setDanmakuOn] = useState(true);
   const [notice, setNotice] = useState('');
 
+  const [likes, setLikes] = useState({});
+  const [likeBusy, setLikeBusy] = useState({});
+
   const demo = isDemo();
   const activeVideo = useMemo(() => videos.find((v) => v.id === activeId) || null, [videos, activeId]);
 
@@ -92,6 +97,20 @@ export default function VideoPanel() {
     refreshAuth();
     loadVideos();
   }, [loadVideos, refreshAuth]);
+
+  useEffect(() => {
+    let alive = true;
+    listLikes()
+      .then((map) => {
+        if (alive) setLikes(map || {});
+      })
+      .catch(() => {
+        /* 点赞数加载失败不阻塞页面，按钮仍可点击 */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [videos]);
 
   useEffect(() => {
     if (!activeId) {
@@ -269,6 +288,32 @@ export default function VideoPanel() {
     }
   };
 
+  /* ------------------------------ 点赞 ------------------------------ */
+
+  const handleToggleLike = async (video) => {
+    if (likeBusy[video.id]) return;
+    const prev = likes[video.id] || { count: 0, liked: false };
+    const optimistic = {
+      count: Math.max(0, prev.count + (prev.liked ? -1 : 1)),
+      liked: !prev.liked
+    };
+    setLikes((map) => ({ ...map, [video.id]: optimistic }));
+    setLikeBusy((map) => ({ ...map, [video.id]: true }));
+    try {
+      const next = await toggleLike(video.id);
+      setLikes((map) => ({ ...map, [video.id]: { count: next.count, liked: next.liked } }));
+    } catch (err) {
+      setLikes((map) => ({ ...map, [video.id]: prev }));
+      setNotice(err.message || '点赞失败，稍后再试');
+    } finally {
+      setLikeBusy((map) => {
+        const next = { ...map };
+        delete next[video.id];
+        return next;
+      });
+    }
+  };
+
   /* ------------------------------ 渲染 ------------------------------ */
 
   return (
@@ -336,53 +381,77 @@ export default function VideoPanel() {
         </div>
       ) : (
         <div className="video-grid">
-          {videos.map((video, index) => (
-            <article className="video-card" key={video.id}>
-              <button
-                type="button"
-                className="video-card-media"
-                onClick={() => setActiveId(video.id)}
-                aria-label={`打开 ${video.title}`}
-              >
-                {video.cover_url ? (
-                  <img
-                    src={video.cover_url}
-                    alt=""
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  <span className="video-card-placeholder" aria-hidden="true">
-                    <span className="video-card-index">{String(index + 1).padStart(2, '0')}</span>
-                    <span className="video-card-bvid">{video.bvid}</span>
+          {videos.map((video, index) => {
+            const like = likes[video.id] || { count: 0, liked: false };
+            return (
+              <article className="video-card" key={video.id}>
+                <button
+                  type="button"
+                  className="video-card-media"
+                  onClick={() => setActiveId(video.id)}
+                  aria-label={`打开 ${video.title}`}
+                >
+                  {video.cover_url ? (
+                    <img
+                      src={video.cover_url}
+                      alt=""
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <span className="video-card-placeholder" aria-hidden="true">
+                      <span className="video-card-index">{String(index + 1).padStart(2, '0')}</span>
+                      <span className="video-card-bvid">{video.bvid}</span>
+                    </span>
+                  )}
+                  <span className="video-card-play" aria-hidden="true">
+                    ▶
                   </span>
+                </button>
+                <div className="video-card-meta">
+                  <div className="video-card-copy">
+                    <h3>{video.title}</h3>
+                    {video.description && <p>{video.description}</p>}
+                  </div>
+                  <div className="video-card-side">
+                    <button
+                      type="button"
+                      className={`video-like${like.liked ? ' is-liked' : ''}`}
+                      onClick={() => handleToggleLike(video)}
+                      aria-pressed={like.liked}
+                      aria-label={like.liked ? '取消点赞' : `点赞，当前 ${like.count} 个赞`}
+                      title={like.liked ? '取消点赞' : '点赞'}
+                      disabled={Boolean(likeBusy[video.id])}
+                    >
+                      <span className="video-like-heart" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" width="11" height="11" focusable="false">
+                          <path
+                            d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      </span>
+                      <span className="video-like-count">{like.count}</span>
+                    </button>
+                    <span className="video-card-date">{formatDate(video.created_at)}</span>
+                  </div>
+                </div>
+                {owner && (
+                  <div className="video-card-admin">
+                    <button type="button" onClick={() => openEditor(video)}>
+                      编辑
+                    </button>
+                    <button type="button" onClick={() => handleDeleteVideo(video)}>
+                      删除
+                    </button>
+                  </div>
                 )}
-                <span className="video-card-play" aria-hidden="true">
-                  ▶
-                </span>
-              </button>
-              <div className="video-card-meta">
-                <div className="video-card-copy">
-                  <h3>{video.title}</h3>
-                  {video.description && <p>{video.description}</p>}
-                </div>
-                <span className="video-card-date">{formatDate(video.created_at)}</span>
-              </div>
-              {owner && (
-                <div className="video-card-admin">
-                  <button type="button" onClick={() => openEditor(video)}>
-                    编辑
-                  </button>
-                  <button type="button" onClick={() => handleDeleteVideo(video)}>
-                    删除
-                  </button>
-                </div>
-              )}
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
 
@@ -401,6 +470,24 @@ export default function VideoPanel() {
                 <h3>{activeVideo.title}</h3>
               </div>
               <div className="video-modal-actions">
+                <button
+                  type="button"
+                  className={`video-icon-button video-like-inline${
+                    likes[activeVideo.id]?.liked ? ' is-liked' : ''
+                  }`}
+                  onClick={() => handleToggleLike(activeVideo)}
+                  aria-pressed={Boolean(likes[activeVideo.id]?.liked)}
+                  aria-label={likes[activeVideo.id]?.liked ? '取消点赞' : '点赞'}
+                  disabled={Boolean(likeBusy[activeVideo.id])}
+                >
+                  <svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true" focusable="false">
+                    <path
+                      d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  {likes[activeVideo.id]?.count ?? 0}
+                </button>
                 <button
                   type="button"
                   className="video-icon-button"

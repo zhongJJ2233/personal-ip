@@ -4,7 +4,10 @@ const LS = {
   videos: 'li_video_videos_v1',
   comments: 'li_video_comments_v1',
   session: 'li_video_session_v1',
-  nickname: 'li_video_nickname'
+  nickname: 'li_video_nickname',
+  likes: 'li_video_likes_v1',
+  liked: 'li_video_liked_v1',
+  visitor: 'li_video_visitor_v1'
 };
 
 const readLS = (key, fallback) => {
@@ -26,6 +29,25 @@ const writeLS = (key, value) => {
 
 const nowISO = () => new Date().toISOString();
 const uid = () => (crypto?.randomUUID ? crypto.randomUUID() : `v-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+
+/** 访客标识：只存在本机，用来记住「我点过赞」并防止重复点赞。 */
+function visitorId() {
+  let id = '';
+  try {
+    id = localStorage.getItem(LS.visitor) || '';
+  } catch {
+    id = '';
+  }
+  if (!id) {
+    id = uid();
+    try {
+      localStorage.setItem(LS.visitor, id);
+    } catch {
+      /* 忽略隐私模式下的写入失败 */
+    }
+  }
+  return id;
+}
 
 const DEMO_VIDEOS = [
   {
@@ -89,6 +111,29 @@ const demoApi = {
   async deleteVideo(id) {
     writeLS(LS.videos, demoVideos().filter((v) => v.id !== id));
     writeLS(LS.comments, demoComments().filter((c) => c.video_id !== id));
+    const counts = readLS(LS.likes, {});
+    delete counts[id];
+    writeLS(LS.likes, counts);
+    writeLS(LS.liked, readLS(LS.liked, []).filter((likedId) => likedId !== id));
+  },
+  async listLikes() {
+    const counts = readLS(LS.likes, {});
+    const liked = readLS(LS.liked, []);
+    const map = {};
+    Object.entries(counts).forEach(([id, count]) => {
+      map[id] = { count, liked: liked.includes(id) };
+    });
+    return map;
+  },
+  async toggleLike(videoId) {
+    const counts = readLS(LS.likes, {});
+    const liked = readLS(LS.liked, []);
+    const wasLiked = liked.includes(videoId);
+    const nextLiked = wasLiked ? liked.filter((id) => id !== videoId) : [...liked, videoId];
+    const count = Math.max(0, (counts[videoId] || 0) + (wasLiked ? -1 : 1));
+    writeLS(LS.liked, nextLiked);
+    writeLS(LS.likes, { ...counts, [videoId]: count });
+    return { videoId, count, liked: !wasLiked };
   },
   async listComments(videoId) {
     return demoComments()
@@ -204,6 +249,41 @@ const supabaseApi = {
   },
   async deleteComment(id) {
     await rest(`/rest/v1/comments?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+  async listLikes() {
+    const rows = await rest('/rest/v1/video_likes?select=video_id,visitor_id');
+    const me = visitorId();
+    const map = {};
+    (rows || []).forEach((row) => {
+      const entry = map[row.video_id] || { count: 0, liked: false };
+      entry.count += 1;
+      if (row.visitor_id === me) entry.liked = true;
+      map[row.video_id] = entry;
+    });
+    return map;
+  },
+  async toggleLike(videoId) {
+    const me = visitorId();
+    const mine = await rest(
+      `/rest/v1/video_likes?video_id=eq.${encodeURIComponent(videoId)}&visitor_id=eq.${encodeURIComponent(me)}&select=id`
+    );
+    const wasLiked = Array.isArray(mine) && mine.length > 0;
+    if (wasLiked) {
+      await rest(
+        `/rest/v1/video_likes?video_id=eq.${encodeURIComponent(videoId)}&visitor_id=eq.${encodeURIComponent(me)}`,
+        { method: 'DELETE' }
+      );
+    } else {
+      await rest('/rest/v1/video_likes', {
+        method: 'POST',
+        body: { video_id: videoId, visitor_id: me, created_at: nowISO() },
+        prefer: 'return=minimal'
+      });
+    }
+    const rows = await rest(
+      `/rest/v1/video_likes?video_id=eq.${encodeURIComponent(videoId)}&select=visitor_id`
+    );
+    return { videoId, count: Array.isArray(rows) ? rows.length : 0, liked: !wasLiked };
   }
 };
 
@@ -219,6 +299,8 @@ export const deleteVideo = (id) => api.deleteVideo(id);
 export const listComments = (videoId) => api.listComments(videoId);
 export const addComment = (input) => api.addComment(input);
 export const deleteComment = (id) => api.deleteComment(id);
+export const listLikes = () => api.listLikes();
+export const toggleLike = (videoId) => api.toggleLike(videoId);
 
 export function getSession() {
   return session;

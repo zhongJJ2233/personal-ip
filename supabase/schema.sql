@@ -66,7 +66,31 @@ create policy "comments insert for everyone" on public.comments
 create policy "comments delete by owner" on public.comments
   for delete to authenticated using (public.is_owner());
 
--- 8. 可选：如果你想预置一条示例影像，取消下面注释再运行
+-- 8. 点赞表：同一访客对同一条影像最多一个赞
+--    visitor_id 由浏览器本地随机生成，用来去重和记住「我赞过」，不含个人信息。
+create table if not exists public.video_likes (
+  id         uuid primary key default gen_random_uuid(),
+  video_id   uuid not null references public.videos(id) on delete cascade,
+  visitor_id text not null check (char_length(visitor_id) between 8 and 64),
+  created_at timestamptz not null default now(),
+  unique (video_id, visitor_id)
+);
+
+create index if not exists video_likes_video_idx on public.video_likes (video_id asc);
+
+alter table public.video_likes enable row level security;
+
+drop policy if exists "likes read for all"       on public.video_likes;
+drop policy if exists "likes insert for everyone" on public.video_likes;
+drop policy if exists "likes delete for everyone" on public.video_likes;
+create policy "likes read for all"        on public.video_likes for select using (true);
+create policy "likes insert for everyone" on public.video_likes
+  for insert to anon, authenticated
+  with check (char_length(visitor_id) between 8 and 64);
+create policy "likes delete for everyone" on public.video_likes
+  for delete to anon, authenticated using (true);
+
+-- 9. 可选：如果你想预置一条示例影像，取消下面注释再运行
 -- insert into public.videos (bvid, title, description, sort_order)
 -- values ('BV1GJ411x7h7', '示例影像 / 夜行', '换成你自己的 B 站视频即可。', 1);
 
