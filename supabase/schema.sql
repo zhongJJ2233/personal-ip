@@ -95,6 +95,84 @@ create policy "likes delete for everyone" on public.video_likes
 -- values ('BV1GJ411x7h7', '示例影像 / 夜行', '换成你自己的 B 站视频即可。', 1);
 
 -- ============================================================================
+-- 10. 近期我说的（博客面板）
+--     站主可以发布 / 编辑 / 删除帖子；访客可以浏览、点赞、转发、评论（可带 emoji）。
+--     转发 = 复制带 #post/<id> 的链接，不落库。
+-- ============================================================================
+
+-- 10.1 帖子表：只有站主能写
+create table if not exists public.posts (
+  id          uuid primary key default gen_random_uuid(),
+  title       text not null check (char_length(title) between 1 and 60),
+  body        text not null check (char_length(body) between 1 and 5000),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists posts_created_idx on public.posts (created_at desc);
+
+alter table public.posts enable row level security;
+
+drop policy if exists "posts read for all"     on public.posts;
+drop policy if exists "posts insert by owner"  on public.posts;
+drop policy if exists "posts update by owner"  on public.posts;
+drop policy if exists "posts delete by owner"  on public.posts;
+create policy "posts read for all"    on public.posts for select using (true);
+create policy "posts insert by owner" on public.posts for insert to authenticated with check (public.is_owner());
+create policy "posts update by owner" on public.posts for update to authenticated using (public.is_owner()) with check (public.is_owner());
+create policy "posts delete by owner" on public.posts for delete to authenticated using (public.is_owner());
+
+-- 10.2 帖子评论：访客可发（含 emoji），站主可删
+create table if not exists public.post_comments (
+  id          uuid primary key default gen_random_uuid(),
+  post_id     uuid not null references public.posts(id) on delete cascade,
+  nickname    text not null default '匿名访客' check (char_length(nickname) between 1 and 20),
+  content     text not null check (char_length(content) between 1 and 200),
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists post_comments_post_idx on public.post_comments (post_id asc, created_at asc);
+
+alter table public.post_comments enable row level security;
+
+drop policy if exists "post comments read for all"        on public.post_comments;
+drop policy if exists "post comments insert for everyone" on public.post_comments;
+drop policy if exists "post comments delete by owner"     on public.post_comments;
+create policy "post comments read for all" on public.post_comments for select using (true);
+create policy "post comments insert for everyone" on public.post_comments
+  for insert to anon, authenticated
+  with check (char_length(content) between 1 and 200);
+create policy "post comments delete by owner" on public.post_comments
+  for delete to authenticated using (public.is_owner());
+
+-- 10.3 帖子点赞：同一访客对同一篇最多一个赞
+create table if not exists public.post_likes (
+  id         uuid primary key default gen_random_uuid(),
+  post_id    uuid not null references public.posts(id) on delete cascade,
+  visitor_id text not null check (char_length(visitor_id) between 8 and 64),
+  created_at timestamptz not null default now(),
+  unique (post_id, visitor_id)
+);
+
+create index if not exists post_likes_post_idx on public.post_likes (post_id asc);
+
+alter table public.post_likes enable row level security;
+
+drop policy if exists "post likes read for all"        on public.post_likes;
+drop policy if exists "post likes insert for everyone" on public.post_likes;
+drop policy if exists "post likes delete for everyone" on public.post_likes;
+create policy "post likes read for all"        on public.post_likes for select using (true);
+create policy "post likes insert for everyone" on public.post_likes
+  for insert to anon, authenticated
+  with check (char_length(visitor_id) between 8 and 64);
+create policy "post likes delete for everyone" on public.post_likes
+  for delete to anon, authenticated using (true);
+
+-- 10.4 可选：预置一篇示例帖子（把标题和正文换成你自己的）
+-- insert into public.posts (title, body) values
+--   ('第一篇', '这里是正文。空一行分段。');
+
+-- ============================================================================
 -- 运行完之后回到 Supabase：
 --   Project Settings → API → Project URL / anon public key
 -- 把这两个值填进项目根目录的 .env.local（或 GitHub 仓库 Variables）：

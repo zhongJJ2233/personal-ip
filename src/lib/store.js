@@ -7,7 +7,11 @@ const LS = {
   nickname: 'li_video_nickname',
   likes: 'li_video_likes_v1',
   liked: 'li_video_liked_v1',
-  visitor: 'li_video_visitor_v1'
+  visitor: 'li_video_visitor_v1',
+  posts: 'li_blog_posts_v1',
+  postComments: 'li_blog_comments_v1',
+  postLikes: 'li_blog_likes_v1',
+  postLiked: 'li_blog_liked_v1'
 };
 
 const readLS = (key, fallback) => {
@@ -80,6 +84,53 @@ const DEMO_COMMENTS = [
   }
 ];
 
+const DEMO_POSTS = [
+  {
+    id: 'demo-post-1',
+    title: '把灵感变成可以参与的东西',
+    body:
+      '最近在整理这半年做过的事，发现一个共同点：真正留下来的，不是那些「想得很完整」的方案，而是那些「先让人玩起来」的小实验。\n\n' +
+      '比如一场只有二十个人的线下分享，我准备了三页纸，剩下的时间都在听大家说。散场后有两个人留下来，聊到路灯亮起来。那天的收获比任何一次正经的复盘都多。\n\n' +
+      '所以这条博客大概会是这样：不追热点，不写正确的废话，只记录那些还带着温度的具体时刻。更新随缘，但每次都会认真写。',
+    created_at: '2025-01-08T12:30:00.000Z',
+    updated_at: '2025-01-08T12:30:00.000Z'
+  },
+  {
+    id: 'demo-post-2',
+    title: '为什么我还在写长文',
+    body:
+      '短视频教会我节奏，长文教会我耐心。前者是把手伸出去，后者是把手收回来。\n\n' +
+      '写长文的时候，我必须真的想清楚一件事的来龙去脉：它从哪来，中间绕了哪些弯路，最后为什么停在这里。这个过程没人看，但它决定了我说话时有没有底气。\n\n' +
+      '如果你也刚好在写点什么，别急着发。先写完，放一晚，第二天再读一遍。你会发现有一半的句子可以删掉，而剩下的那一半，才是你想说的。',
+    created_at: '2024-12-21T09:05:00.000Z',
+    updated_at: '2024-12-21T09:05:00.000Z'
+  }
+];
+
+const DEMO_POST_COMMENTS = [
+  {
+    id: 'demo-post-comment-1',
+    post_id: 'demo-post-1',
+    nickname: '路过的朋友',
+    content: '「先让人玩起来」这句记下了 🙌',
+    created_at: '2025-01-09T03:20:00.000Z'
+  },
+  {
+    id: 'demo-post-comment-2',
+    post_id: 'demo-post-1',
+    nickname: '匿名观察者',
+    content: '期待更新，随缘也没关系 🌿',
+    created_at: '2025-01-09T11:02:00.000Z'
+  },
+  {
+    id: 'demo-post-comment-3',
+    post_id: 'demo-post-2',
+    nickname: '一个也在写的人',
+    content: '「先写完，放一晚」很受用 ✍️',
+    created_at: '2024-12-22T02:40:00.000Z'
+  }
+];
+
 export const isDemo = () => !backend.enabled;
 
 /* ------------------------------------------------------------------ */
@@ -91,6 +142,12 @@ function demoVideos() {
 }
 function demoComments() {
   return readLS(LS.comments, DEMO_COMMENTS);
+}
+function demoPosts() {
+  return readLS(LS.posts, DEMO_POSTS);
+}
+function demoPostComments() {
+  return readLS(LS.postComments, DEMO_POST_COMMENTS);
 }
 
 const demoApi = {
@@ -147,6 +204,69 @@ const demoApi = {
   },
   async deleteComment(id) {
     writeLS(LS.comments, demoComments().filter((c) => c.id !== id));
+  },
+
+  /* ---------------- 近期我说的（博客） ---------------- */
+
+  async listPosts() {
+    return [...demoPosts()].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  },
+  async savePost(input) {
+    const list = demoPosts();
+    if (input.id) {
+      const next = list.map((p) => (p.id === input.id ? { ...p, ...input, updated_at: nowISO() } : p));
+      writeLS(LS.posts, next);
+      return next.find((p) => p.id === input.id);
+    }
+    const created = { ...input, id: uid(), created_at: nowISO(), updated_at: nowISO() };
+    writeLS(LS.posts, [created, ...list]);
+    return created;
+  },
+  async deletePost(id) {
+    writeLS(LS.posts, demoPosts().filter((p) => p.id !== id));
+    writeLS(LS.postComments, demoPostComments().filter((c) => c.post_id !== id));
+    const counts = readLS(LS.postLikes, {});
+    delete counts[id];
+    writeLS(LS.postLikes, counts);
+    writeLS(LS.postLiked, readLS(LS.postLiked, []).filter((likedId) => likedId !== id));
+  },
+  async listPostLikes() {
+    const counts = readLS(LS.postLikes, {});
+    const liked = readLS(LS.postLiked, []);
+    const map = {};
+    Object.entries(counts).forEach(([id, count]) => {
+      map[id] = { count, liked: liked.includes(id) };
+    });
+    return map;
+  },
+  async togglePostLike(postId) {
+    const counts = readLS(LS.postLikes, {});
+    const liked = readLS(LS.postLiked, []);
+    const wasLiked = liked.includes(postId);
+    writeLS(LS.postLiked, wasLiked ? liked.filter((id) => id !== postId) : [...liked, postId]);
+    const count = Math.max(0, (counts[postId] || 0) + (wasLiked ? -1 : 1));
+    writeLS(LS.postLikes, { ...counts, [postId]: count });
+    return { postId, count, liked: !wasLiked };
+  },
+  async listPostComments(postId) {
+    return demoPostComments()
+      .filter((c) => c.post_id === postId)
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  },
+  async listPostCommentCounts() {
+    const map = {};
+    demoPostComments().forEach((c) => {
+      map[c.post_id] = (map[c.post_id] || 0) + 1;
+    });
+    return map;
+  },
+  async addPostComment(input) {
+    const created = { ...input, id: uid(), created_at: nowISO() };
+    writeLS(LS.postComments, [...demoPostComments(), created]);
+    return created;
+  },
+  async deletePostComment(id) {
+    writeLS(LS.postComments, demoPostComments().filter((c) => c.id !== id));
   }
 };
 
@@ -284,6 +404,90 @@ const supabaseApi = {
       `/rest/v1/video_likes?video_id=eq.${encodeURIComponent(videoId)}&select=visitor_id`
     );
     return { videoId, count: Array.isArray(rows) ? rows.length : 0, liked: !wasLiked };
+  },
+
+  /* ---------------- 近期我说的（博客） ---------------- */
+
+  async listPosts() {
+    return rest('/rest/v1/posts?select=*&order=created_at.desc');
+  },
+  async savePost(input) {
+    if (input.id) {
+      const rows = await rest(`/rest/v1/posts?id=eq.${encodeURIComponent(input.id)}`, {
+        method: 'PATCH',
+        body: { ...input, updated_at: nowISO() },
+        prefer: 'return=representation'
+      });
+      return rows?.[0];
+    }
+    const rows = await rest('/rest/v1/posts', {
+      method: 'POST',
+      body: { ...input, created_at: nowISO(), updated_at: nowISO() },
+      prefer: 'return=representation'
+    });
+    return rows?.[0];
+  },
+  async deletePost(id) {
+    await rest(`/rest/v1/posts?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+  async listPostLikes() {
+    const rows = await rest('/rest/v1/post_likes?select=post_id,visitor_id');
+    const me = visitorId();
+    const map = {};
+    (rows || []).forEach((row) => {
+      const entry = map[row.post_id] || { count: 0, liked: false };
+      entry.count += 1;
+      if (row.visitor_id === me) entry.liked = true;
+      map[row.post_id] = entry;
+    });
+    return map;
+  },
+  async togglePostLike(postId) {
+    const me = visitorId();
+    const mine = await rest(
+      `/rest/v1/post_likes?post_id=eq.${encodeURIComponent(postId)}&visitor_id=eq.${encodeURIComponent(me)}&select=id`
+    );
+    const wasLiked = Array.isArray(mine) && mine.length > 0;
+    if (wasLiked) {
+      await rest(
+        `/rest/v1/post_likes?post_id=eq.${encodeURIComponent(postId)}&visitor_id=eq.${encodeURIComponent(me)}`,
+        { method: 'DELETE' }
+      );
+    } else {
+      await rest('/rest/v1/post_likes', {
+        method: 'POST',
+        body: { post_id: postId, visitor_id: me, created_at: nowISO() },
+        prefer: 'return=minimal'
+      });
+    }
+    const rows = await rest(
+      `/rest/v1/post_likes?post_id=eq.${encodeURIComponent(postId)}&select=visitor_id`
+    );
+    return { postId, count: Array.isArray(rows) ? rows.length : 0, liked: !wasLiked };
+  },
+  async listPostComments(postId) {
+    return rest(
+      `/rest/v1/post_comments?post_id=eq.${encodeURIComponent(postId)}&select=*&order=created_at.asc&limit=200`
+    );
+  },
+  async listPostCommentCounts() {
+    const rows = await rest('/rest/v1/post_comments?select=post_id');
+    const map = {};
+    (rows || []).forEach((row) => {
+      map[row.post_id] = (map[row.post_id] || 0) + 1;
+    });
+    return map;
+  },
+  async addPostComment(input) {
+    const rows = await rest('/rest/v1/post_comments', {
+      method: 'POST',
+      body: { ...input, created_at: nowISO() },
+      prefer: 'return=representation'
+    });
+    return rows?.[0];
+  },
+  async deletePostComment(id) {
+    await rest(`/rest/v1/post_comments?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 };
 
@@ -301,6 +505,17 @@ export const addComment = (input) => api.addComment(input);
 export const deleteComment = (id) => api.deleteComment(id);
 export const listLikes = () => api.listLikes();
 export const toggleLike = (videoId) => api.toggleLike(videoId);
+
+/* 近期我说的（博客） */
+export const listPosts = () => api.listPosts();
+export const savePost = (input) => api.savePost(input);
+export const deletePost = (id) => api.deletePost(id);
+export const listPostLikes = () => api.listPostLikes();
+export const togglePostLike = (postId) => api.togglePostLike(postId);
+export const listPostComments = (postId) => api.listPostComments(postId);
+export const listPostCommentCounts = () => api.listPostCommentCounts();
+export const addPostComment = (input) => api.addPostComment(input);
+export const deletePostComment = (id) => api.deletePostComment(id);
 
 export function getSession() {
   return session;

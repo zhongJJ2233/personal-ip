@@ -15,8 +15,8 @@ const DEFAULT_TEXT = 'Draw Attention';
 
 const StrokeText = ({
   text = DEFAULT_TEXT,
-  strokeColor = '#d7fb55',
-  fillColor = '#f2f1e9',
+  strokeColor = '#17876b',
+  fillColor = '#0e2a33',
   strokeWidth = 1.4,
   drawDuration = 1.6,
   fillDelay = 0.2,

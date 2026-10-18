@@ -3,3 +3,6 @@ node_modules/
 *.local
 .vite/
 dist/
+# 本地 AI 助手配置 / skill（不参与站点构建，也不上传仓库）
+.dsh/
+.agents/

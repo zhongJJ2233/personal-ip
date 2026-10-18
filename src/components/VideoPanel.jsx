@@ -374,12 +374,12 @@ export default function VideoPanel() {
     <section className="video-section" id="video" aria-labelledby="video-title">
       <div className="video-head">
         <div className="video-head-main">
-          <div className="section-kicker">VIDEO ARCHIVE / 03</div>
+          <div className="section-kicker">VIDEO ARCHIVE / 04</div>
           <h2 id="video-title" aria-label="影像档案">
             <StrokeText
               text="影像档案"
-              strokeColor="#f2f1e9"
-              fillColor="#f2f1e9"
+              strokeColor="#0e2a33"
+              fillColor="#0e2a33"
               fontSize={96}
               fontWeight={700}
               letterSpacing={-6}
