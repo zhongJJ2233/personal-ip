@@ -23,6 +23,65 @@ import { fetchBiliInfo, getCachedBili } from '../lib/bili';
 import './VideoPanel.css';
 
 const BVID_PATTERN = /^BV[0-9A-Za-z]{10}$/;
+const DOUYIN_ID_PATTERN = /^\d{15,25}$/;
+
+// 影像支持两个平台：B 站（BV 号）和抖音（视频 ID）。
+// 数据里统一用 platform + bvid（bvid 对抖音来说就是那串数字 ID）。
+const PLATFORMS = {
+  bili: {
+    key: 'bili',
+    name: 'B 站',
+    tag: 'BILIBILI',
+    idLabel: 'B 站视频号（BV 号）',
+    idPlaceholder: 'BV1GJ411x7h7，也可以直接粘贴视频链接',
+    idHint: 'BV 开头共 12 位；粘贴整条 B 站链接也行，会自动取出 BV 号。',
+    watchUrl: (id) => `https://www.bilibili.com/video/${id}`,
+    linkLabel: '去 B 站 ↗'
+  },
+  douyin: {
+    key: 'douyin',
+    name: '抖音',
+    tag: 'DOUYIN',
+    idLabel: '抖音视频 ID',
+    idPlaceholder: '7123456789012345678，也可以直接粘贴视频链接',
+    idHint:
+      '视频页地址 /video/ 后面那串数字；粘贴完整链接会自动取出。v.douyin.com 短链要先在浏览器打开，复制跳转后的地址。',
+    watchUrl: (id) => `https://www.douyin.com/video/${id}`,
+    linkLabel: '去抖音 ↗'
+  }
+};
+
+const platformOf = (video) => (video?.platform === 'douyin' ? 'douyin' : 'bili');
+const platformInfo = (video) => PLATFORMS[platformOf(video)];
+
+const normalizeVideoId = (platform, raw) => {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+  if (platform === 'douyin') {
+    if (DOUYIN_ID_PATTERN.test(text)) return text;
+    const m = text.match(/(?:douyin\.com\/(?:video|note|share\/video)\/|modal_id=)(\d{15,25})/i);
+    return m ? m[1] : '';
+  }
+  if (BVID_PATTERN.test(text)) return text;
+  const m = text.match(/BV[0-9A-Za-z]{10}/);
+  return m ? m[0] : '';
+};
+
+const playerUrl = (video) =>
+  platformOf(video) === 'douyin'
+    ? `https://open.douyin.com/player/video?vid=${encodeURIComponent(video.bvid)}&autoplay=1`
+    : `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(
+        video.bvid
+      )}&page=1&high_quality=1&danmaku=1&autoplay=1&as_wide=1`;
+
+const emptyDraft = () => ({
+  platform: 'bili',
+  bvid: '',
+  title: '',
+  description: '',
+  cover_url: '',
+  sort_order: ''
+});
 
 const formatDate = (iso) => {
   if (!iso) return '';
@@ -37,13 +96,6 @@ const formatDateTime = (iso) => {
   if (Number.isNaN(d.getTime())) return '';
   return `${formatDate(iso)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
-
-const bilibiliUrl = (bvid) => `https://www.bilibili.com/video/${bvid}`;
-
-const playerUrl = (video) =>
-  `https://player.bilibili.com/player.html?bvid=${encodeURIComponent(video.bvid)}&page=1&high_quality=1&danmaku=1&autoplay=1&as_wide=1`;
-
-const emptyDraft = () => ({ bvid: '', title: '', description: '', cover_url: '', sort_order: '' });
 
 export default function VideoPanel() {
   const [videos, setVideos] = useState([]);
@@ -123,7 +175,7 @@ export default function VideoPanel() {
     const need = [];
     const cachedMap = {};
     videos.forEach((video) => {
-      if (video.cover_url || !BVID_PATTERN.test(video.bvid)) return;
+      if (platformOf(video) !== 'bili' || video.cover_url || !BVID_PATTERN.test(video.bvid)) return;
       const cached = getCachedBili(video.bvid);
       if (cached?.pic) cachedMap[video.bvid] = cached.pic;
       else if (!need.includes(video.bvid)) need.push(video.bvid);
@@ -229,6 +281,7 @@ export default function VideoPanel() {
       video
         ? {
             id: video.id,
+            platform: platformOf(video),
             bvid: video.bvid || '',
             title: video.title || '',
             description: video.description || '',
@@ -240,8 +293,13 @@ export default function VideoPanel() {
   };
 
   const handleAutoCover = async () => {
-    const bvid = (draft?.bvid || '').trim();
-    if (!BVID_PATTERN.test(bvid)) {
+    const platform = draft?.platform === 'douyin' ? 'douyin' : 'bili';
+    if (platform === 'douyin') {
+      setDraftError('抖音没有公开的封面接口，直接粘贴一张图片地址就行');
+      return;
+    }
+    const bvid = normalizeVideoId('bili', draft?.bvid);
+    if (!bvid) {
       setDraftError('先填一个正确的 BV 号，再点自动获取');
       return;
     }
@@ -262,9 +320,14 @@ export default function VideoPanel() {
 
   const handleSaveVideo = async (e) => {
     e.preventDefault();
-    const bvid = draft.bvid.trim();
-    if (!BVID_PATTERN.test(bvid)) {
-      setDraftError('BV 号格式不对，例如 BV1GJ411x7h7（共 12 位，BV 开头）');
+    const platform = draft.platform === 'douyin' ? 'douyin' : 'bili';
+    const bvid = normalizeVideoId(platform, draft.bvid);
+    if (!bvid) {
+      setDraftError(
+        platform === 'douyin'
+          ? '抖音视频 ID 不对：应该是 /video/ 后面那串 19 位数字，例如 7123456789012345678'
+          : 'BV 号格式不对，例如 BV1GJ411x7h7（共 12 位，BV 开头）'
+      );
       return;
     }
     const title = draft.title.trim() || '未命名影像';
@@ -273,6 +336,7 @@ export default function VideoPanel() {
     try {
       await saveVideo({
         ...(draft.id ? { id: draft.id } : {}),
+        platform,
         bvid,
         title,
         description: draft.description.trim(),
@@ -394,7 +458,7 @@ export default function VideoPanel() {
         </div>
         <div className="video-head-side">
           <p className="video-note">
-            视频放在 B 站，画面里的弹幕由 B 站播放器原生提供；
+            视频放在 B 站或抖音，画面里的弹幕由平台播放器原生提供；
             这里再留一层站内弹幕和评论，随看随发。
           </p>
           {owner ? (
@@ -437,7 +501,8 @@ export default function VideoPanel() {
         <div className="video-grid">
           {videos.map((video, index) => {
             const like = likes[video.id] || { count: 0, liked: false };
-            const coverSrc = video.cover_url || biliCovers[video.bvid] || '';
+            const coverSrc =
+              video.cover_url || (platformOf(video) === 'bili' ? biliCovers[video.bvid] : '') || '';
             const coverBroken = Boolean(brokenCovers[video.bvid]);
             return (
               <article className="video-card" key={video.id}>
@@ -460,9 +525,12 @@ export default function VideoPanel() {
                   ) : (
                     <span className="video-card-placeholder" aria-hidden="true">
                       <span className="video-card-index">{String(index + 1).padStart(2, '0')}</span>
-                      <span className="video-card-bvid">{video.bvid}</span>
+                      <span className="video-card-bvid">
+                        {platformInfo(video).tag} · {video.bvid}
+                      </span>
                     </span>
                   )}
+                  <span className="video-card-platform">{platformInfo(video).name}</span>
                   <span className="video-card-play" aria-hidden="true">
                     ▶
                   </span>
@@ -522,7 +590,9 @@ export default function VideoPanel() {
           <div className="video-modal" role="dialog" aria-modal="true" aria-label={activeVideo.title}>
             <header className="video-modal-head">
               <div className="video-modal-title">
-                <p>{activeVideo.bvid}</p>
+                <p>
+                  {platformInfo(activeVideo).tag} · {activeVideo.bvid}
+                </p>
                 <h3>{activeVideo.title}</h3>
               </div>
               <div className="video-modal-actions">
@@ -554,11 +624,11 @@ export default function VideoPanel() {
                 </button>
                 <a
                   className="video-icon-button"
-                  href={bilibiliUrl(activeVideo.bvid)}
+                  href={platformInfo(activeVideo).watchUrl(activeVideo.bvid)}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  去 B 站 ↗
+                  {platformInfo(activeVideo).linkLabel}
                 </a>
                 <button type="button" className="video-icon-button video-close" onClick={closeAll} aria-label="关闭">
                   ✕
@@ -584,6 +654,11 @@ export default function VideoPanel() {
 
               <div className="video-modal-side">
                 {activeVideo.description && <p className="video-modal-desc">{activeVideo.description}</p>}
+                {platformOf(activeVideo) === 'douyin' && (
+                  <p className="video-modal-hint">
+                    抖音竖版视频会在播放器里居中显示；想满屏看，点右上角「去抖音 ↗」。
+                  </p>
+                )}
 
                 <form className="video-comment-form" onSubmit={handleSubmitComment}>
                   <div className="video-comment-row">
@@ -668,13 +743,27 @@ export default function VideoPanel() {
               </button>
             </header>
             <label>
-              <span>B 站视频号（BV 号）</span>
+              <span>视频平台</span>
+              <select
+                value={draft.platform || 'bili'}
+                onChange={(e) => {
+                  const platform = e.target.value;
+                  setDraft((d) => ({ ...d, platform, bvid: normalizeVideoId(platform, d.bvid) }));
+                }}
+              >
+                <option value="bili">B 站（BV 号）</option>
+                <option value="douyin">抖音（视频 ID）</option>
+              </select>
+            </label>
+            <label>
+              <span>{platformInfo(draft).idLabel}</span>
               <input
                 value={draft.bvid}
                 onChange={(e) => setDraft((d) => ({ ...d, bvid: e.target.value }))}
-                placeholder="BV1GJ411x7h7"
+                placeholder={platformInfo(draft).idPlaceholder}
                 autoFocus
               />
+              <small className="video-field-hint">{platformInfo(draft).idHint}</small>
             </label>
             <label>
               <span>标题</span>
@@ -698,19 +787,25 @@ export default function VideoPanel() {
             <label>
               <span className="video-field-head">
                 封面图链接
-                <button
-                  type="button"
-                  className="video-inline-link"
-                  onClick={handleAutoCover}
-                  disabled={autoCoverBusy}
-                >
-                  {autoCoverBusy ? '获取中…' : '从 B 站自动获取'}
-                </button>
+                {platformOf(draft) === 'bili' && (
+                  <button
+                    type="button"
+                    className="video-inline-link"
+                    onClick={handleAutoCover}
+                    disabled={autoCoverBusy}
+                  >
+                    {autoCoverBusy ? '获取中…' : '从 B 站自动获取'}
+                  </button>
+                )}
               </span>
               <input
                 value={draft.cover_url}
                 onChange={(e) => setDraft((d) => ({ ...d, cover_url: e.target.value }))}
-                placeholder="可选，留空就自动用 B 站封面"
+                placeholder={
+                  platformOf(draft) === 'bili'
+                    ? '可选，留空就自动用 B 站封面'
+                    : '可选，抖音建议粘贴一张 16:9 图片地址'
+                }
               />
             </label>
             <label>

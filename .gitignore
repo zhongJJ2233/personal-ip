@@ -6,3 +6,6 @@ dist/
 # 本地 AI 助手配置 / skill（不参与站点构建，也不上传仓库）
 .dsh/
 .agents/
+
+# 本地视频流水线项目（独立工具，含 ffmpeg / node_modules，不参与站点构建）
+video/

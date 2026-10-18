@@ -4,10 +4,12 @@
 -- 使用前把下面 'YOUR_EMAIL_HERE' 改成你自己的登录邮箱（两处都要改）。
 -- ============================================================================
 
--- 1. 影像表：一条记录 = 一条 B 站视频
+-- 1. 影像表：一条记录 = 一条影像（B 站或抖音）
+--    bvid 存「外部视频 ID」：B 站是 BV 号，抖音是 15-25 位数字
 create table if not exists public.videos (
   id          uuid primary key default gen_random_uuid(),
-  bvid        text not null check (bvid ~ '^BV[0-9A-Za-z]{10}$'),
+  platform    text not null default 'bili' check (platform in ('bili', 'douyin')),
+  bvid        text not null check (bvid ~ '^(BV[0-9A-Za-z]{10}|[0-9]{15,25})$'),
   title       text not null check (char_length(title) between 1 and 80),
   description text not null default '',
   cover_url   text not null default '',
@@ -171,6 +173,24 @@ create policy "post likes delete for everyone" on public.post_likes
 -- 10.4 可选：预置一篇示例帖子（把标题和正文换成你自己的）
 -- insert into public.posts (title, body) values
 --   ('第一篇', '这里是正文。空一行分段。');
+
+-- ============================================================================
+-- 11. 影像支持抖音：新增 platform 字段，放宽 bvid 的校验
+--     已经跑过前面脚本的，把这一节再执行一次即可（幂等）。
+-- ============================================================================
+
+-- 11.1 平台：bili（B 站）或 douyin（抖音），老数据默认 B 站
+alter table public.videos add column if not exists platform text not null default 'bili';
+
+-- 11.2 bvid 现在存「外部视频 ID」：B 站是 BV 号，抖音是 15-25 位数字
+alter table public.videos drop constraint if exists videos_bvid_check;
+alter table public.videos add constraint videos_bvid_check
+  check (bvid ~ '^(BV[0-9A-Za-z]{10}|[0-9]{15,25})$');
+
+-- 11.3 平台取值只能是这两个
+alter table public.videos drop constraint if exists videos_platform_check;
+alter table public.videos add constraint videos_platform_check
+  check (platform in ('bili', 'douyin'));
 
 -- ============================================================================
 -- 运行完之后回到 Supabase：

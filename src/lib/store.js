@@ -56,9 +56,10 @@ function visitorId() {
 const DEMO_VIDEOS = [
   {
     id: 'demo-video-1',
+    platform: 'bili',
     bvid: 'BV1GJ411x7h7',
     title: '示例影像 / 夜行',
-    description: '这是一条示例影像。站主登录后台后，可以把它替换成自己的 B 站视频。',
+    description: '这是一条示例影像。站主登录后台后，可以把它换成自己的 B 站或抖音视频。',
     cover_url: '',
     sort_order: 1,
     created_at: '2025-01-10T20:00:00.000Z'

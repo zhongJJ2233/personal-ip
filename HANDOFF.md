@@ -268,3 +268,25 @@ git add -A && git commit -m "..." && git push   # push 触发 GitHub Actions 自
 - 站主登录沿用同一套 Supabase Auth（`signIn`/`signOut`），演示模式下任意账号可进（提示文案已注明）。
 
 **验证**：`npm run build` 通过（CSS 40.5KB gzip 8.3KB，JS 327KB gzip 115KB）；CDP 实测通过：站主登录 → 发帖 → 卡片置顶 → 点赞 → 打开阅读 → emoji 插入 → 发评论 → 转发 → 深链 `#post/demo-post-1` 自动打开 → 编辑改名 → 两步删除 → 退出；1440 / 390 两档截图在 `.dsh/blog-after/`；控制台无报错；`inspect.mjs` 审计 10 FAIL / 5 WARN（与加面板前一致，均为既有的编辑风设计选择：装饰序号、hairline、渐变、小字等）。
+
+## 12. 2026-10-18 20:33 会话：影像面板接入抖音
+
+**动机**：用户 m01054：「视频面板除了接入b站的，也要接入抖音的。」
+
+**数据层**：`videos` 表新增 `platform text not null default 'bili'`（取值 `bili` / `douyin`）；`bvid` 字段改作「外部视频 ID」——B 站存 BV 号，抖音存 15–25 位数字 ID，check 放宽为 `^(BV[0-9A-Za-z]{10}|[0-9]{15,25})$`。`store.js` 的 demo / Supabase 两条路径都是 spread 透传，接口无需改动；`DEMO_VIDEOS` 补了 `platform: 'bili'`。建表脚本：第 1 节直接按新结构建表，另加第 11 节幂等迁移（add column / drop+add constraint），老库把整段重跑一次即可。
+
+**抖音嵌入结论**（curl 实测）：
+- 官方播放器 `https://open.douyin.com/player/video?vid=<aweme_id>&autoplay=1` 返回 200，且响应头**没有** X-Frame-Options / CSP frame-ancestors → 可以 iframe 嵌入。
+- 观看页是 `https://www.douyin.com/video/<id>`；`www.douyin.com/embed/<id>` 是普通分享页、不是播放器，别用。
+- 抖音没有公开、免签名的封面/标题接口（aweme detail 需要 a-bogus 签名），所以抖音影像的封面只能手动粘贴图片地址；短链 `v.douyin.com/xxx` 浏览器端无法解析，UI 里提示用户先打开复制跳转地址。
+
+**前端**（`src/components/VideoPanel.jsx`）：
+- 新增 `DOUYIN_ID_PATTERN`、`PLATFORMS` 映射（bili/douyin 各自的 name / tag / idLabel / idPlaceholder / idHint / watchUrl / linkLabel）、`platformOf`、`platformInfo`、`normalizeVideoId`（能从整条 B 站/抖音链接里抠出 ID）；`playerUrl` 按平台切换；`emptyDraft` / `openEditor` 带 platform。
+- 编辑弹层：新增「视频平台」下拉（B 站 / 抖音），ID 字段的标签、占位符、提示随平台变化；封面旁的「从 B 站自动获取」只在 B 站模式出现（抖音点它会提示没有公开封面接口）。
+- 卡片：左上角平台徽标（B 站 / 抖音）；无封面时占位图显示 `BILIBILI · BV…` / `DOUYIN · 数字ID`；自动封面 effect 只对 `platform === 'bili'` 生效。
+- 播放弹层：头部显示 `平台 TAG · ID`，外链按平台切到 B 站 / 抖音观看页；抖音多一行提示「竖版视频居中显示，想满屏点去抖音」。
+- CSS：`.video-card-platform` 徽标、`.video-sheet select`（含自绘箭头）、`.video-field-hint`、`.video-modal-hint`。
+
+**文档**：`影像面板-使用说明.md` 全面补抖音（平台选择、ID 从哪来、粘贴链接自动取 ID、抖音无自动封面、竖版显示、排查项）。
+
+**验证**：`npm run build` 通过（CSS 41.35KB gzip 8.47KB、JS 328.92KB gzip 115.81KB）；CDP 实测 17 项全 PASS：站主登录 → 新增抖音影像（粘贴整条链接自动取出 `7412345678901234567`）→ 卡片徽标与 ID → 弹层 iframe `open.douyin.com/player/video?vid=…`、外链「去抖音 ↗」→ B 站影像 iframe / 外链不受影响 → 编辑抖音影像时平台与 ID 正确回填 → 390 手机端徽标正常；控制台无 JS 异常；截图在 `.dsh/douyin-after/`。
