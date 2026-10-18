@@ -286,4 +286,4 @@ git add -A && git commit -m "..." && git push   # push 触发 GitHub Actions 自
 
 **验证**：`npm run build` 通过（CSS 41.8KB gzip 8.6KB，JS 328KB gzip 115.5KB）；CDP 截图 `artifacts/hero-clock.png`；`document.querySelector('.hero-clock')` 的 `getBoundingClientRect` 确认 `right <= .hero-visual.left`；控制台无报错（仅 Edge 自带扩展的无关 TypeError）。
 
-**状态**：已在本地提交；**是否发布等待用户确认**（推送需 GitHub 设备授权）。
+**状态**：已发布。提交 `03b0d42`，Actions run `39132940451` 成功，线上资源 `index-DfBgtJVO.js` / `index-B5LPSCjw.css`；线上实测时钟正常跳动（21:50:54 → 21:50:55），控制台无报错。
